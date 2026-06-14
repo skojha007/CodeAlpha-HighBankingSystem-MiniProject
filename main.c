@@ -205,6 +205,66 @@ void closeAccount() {
     printf("Account %d has been closed successfully.\n", accNum);
 }
 
+/* Transfers a validated amount from one account to another atomically */
+void transferFunds() {
+    int fromAccNum, toAccNum;
+
+    printf("\n--- Fund Transfer ---\n");
+    printf("Enter Source Account Number: ");
+    scanf("%d", &fromAccNum);
+
+    int fromIdx = findAccount(fromAccNum);
+    if (fromIdx == -1) {
+        printf("Error: Source account %d not found.\n", fromAccNum);
+        return;
+    }
+
+    printf("Enter Destination Account Number: ");
+    scanf("%d", &toAccNum);
+
+    if (fromAccNum == toAccNum) {
+        printf("Error: Source and destination accounts cannot be the same.\n");
+        return;
+    }
+
+    int toIdx = findAccount(toAccNum);
+    if (toIdx == -1) {
+        printf("Error: Destination account %d not found.\n", toAccNum);
+        return;
+    }
+
+    printf("Transfer from : %s (Balance: Rs.%.2f)\n",
+           accounts[fromIdx].holderName, accounts[fromIdx].balance);
+    printf("Transfer to   : %s\n", accounts[toIdx].holderName);
+
+    float amount;
+    printf("Enter amount to transfer: Rs.");
+    scanf("%f", &amount);
+
+    if (amount <= 0) {
+        printf("Error: Transfer amount must be greater than 0.\n");
+        return;
+    }
+    if (amount > accounts[fromIdx].balance) {
+        printf("Error: Insufficient Funds in source account.\n");
+        printf("Available Balance: Rs.%.2f\n", accounts[fromIdx].balance);
+        return;
+    }
+
+    /* Perform the atomic transfer — debit source, credit destination */
+    accounts[fromIdx].balance -= amount;
+    accounts[toIdx].balance   += amount;
+    saveAllToFile();
+
+    printf("\nTransfer successful!\n");
+    printf("Rs.%.2f transferred from Account %d to Account %d.\n",
+           amount, fromAccNum, toAccNum);
+    printf("%-20s New Balance: Rs.%.2f\n",
+           accounts[fromIdx].holderName, accounts[fromIdx].balance);
+    printf("%-20s New Balance: Rs.%.2f\n",
+           accounts[toIdx].holderName, accounts[toIdx].balance);
+}
+
 /* Prints a summary of all accounts currently stored */
 void listAllAccounts() {
     if (accountCount == 0) {
@@ -232,8 +292,9 @@ void displayMenu() {
     printf("3. Withdraw\n");
     printf("4. Balance Enquiry\n");
     printf("5. List All Accounts\n");
-    printf("6. Close Account\n");
-    printf("7. Exit\n");
+    printf("6. Transfer Funds\n");
+    printf("7. Close Account\n");
+    printf("8. Exit\n");
     printf("Enter your choice: ");
 }
 
@@ -262,13 +323,16 @@ int main() {
                 listAllAccounts();
                 break;
             case 6:
-                closeAccount();
+                transferFunds();
                 break;
             case 7:
+                closeAccount();
+                break;
+            case 8:
                 printf("Thank you for banking with us!\n");
                 exit(0);
             default:
-                printf("Invalid choice. Please enter 1-7.\n");
+                printf("Invalid choice. Please enter 1-8.\n");
         }
     }
 
