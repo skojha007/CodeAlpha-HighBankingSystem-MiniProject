@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define MAX_ACCOUNTS 100
 
@@ -13,6 +14,22 @@ struct BankAccount {
 /* Global account store */
 struct BankAccount accounts[MAX_ACCOUNTS];
 int accountCount = 0;
+
+/* Appends a single transaction record to "transactions.log" with timestamp */
+void logTransaction(int accNum, const char *type, float amount, float balanceAfter) {
+    FILE *fp = fopen("transactions.log", "a");
+    if (fp == NULL) {
+        printf("Warning: Could not write to transaction log.\n");
+        return;
+    }
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    char timestamp[20];
+    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", t);
+    fprintf(fp, "[%s] Acct:%-6d | %-18s | Amount: Rs.%10.2f | Balance: Rs.%10.2f\n",
+            timestamp, accNum, type, amount, balanceAfter);
+    fclose(fp);
+}
 
 /* Saves all accounts to binary file "account.dat" (count + all structs) */
 void saveAllToFile() {
@@ -86,6 +103,7 @@ void createAccount() {
 
     accounts[accountCount++] = newAcc;
     saveAllToFile();
+    logTransaction(newAcc.accountNumber, "ACCOUNT OPENED", newAcc.balance, newAcc.balance);
     printf("Account created successfully! (Account Number: %d)\n", newAcc.accountNumber);
 }
 
@@ -111,6 +129,7 @@ void deposit() {
 
     accounts[idx].balance += amount;
     saveAllToFile();
+    logTransaction(accounts[idx].accountNumber, "DEPOSIT", amount, accounts[idx].balance);
     printf("Amount Rs.%.2f deposited successfully!\n", amount);
     printf("New Balance: Rs.%.2f\n", accounts[idx].balance);
 }
@@ -141,6 +160,7 @@ void withdraw() {
 
     accounts[idx].balance -= amount;
     saveAllToFile();
+    logTransaction(accounts[idx].accountNumber, "WITHDRAWAL", amount, accounts[idx].balance);
     printf("Amount Rs.%.2f withdrawn successfully!\n", amount);
     printf("Remaining Balance: Rs.%.2f\n", accounts[idx].balance);
 }
@@ -255,6 +275,8 @@ void transferFunds() {
     accounts[fromIdx].balance -= amount;
     accounts[toIdx].balance   += amount;
     saveAllToFile();
+    logTransaction(accounts[fromIdx].accountNumber, "TRANSFER OUT", amount, accounts[fromIdx].balance);
+    logTransaction(accounts[toIdx].accountNumber,   "TRANSFER IN",  amount, accounts[toIdx].balance);
 
     printf("\nTransfer successful!\n");
     printf("Rs.%.2f transferred from Account %d to Account %d.\n",
@@ -263,6 +285,47 @@ void transferFunds() {
            accounts[fromIdx].holderName, accounts[fromIdx].balance);
     printf("%-20s New Balance: Rs.%.2f\n",
            accounts[toIdx].holderName, accounts[toIdx].balance);
+}
+
+/* Reads transactions.log and displays entries for a given account number */
+void viewTransactionHistory() {
+    int accNum;
+    printf("\nEnter Account Number to view history: ");
+    scanf("%d", &accNum);
+
+    if (findAccount(accNum) == -1) {
+        printf("Error: Account number %d not found.\n", accNum);
+        return;
+    }
+
+    FILE *fp = fopen("transactions.log", "r");
+    if (fp == NULL) {
+        printf("No transaction history found.\n");
+        return;
+    }
+
+    char line[256];
+    char searchKey[16];
+    /* Build the exact account field pattern to match log entries */
+    snprintf(searchKey, sizeof(searchKey), "Acct:%-6d", accNum);
+
+    int found = 0;
+    printf("\n--- Transaction History for Account %d ---\n", accNum);
+    printf("--------------------------------------------------------------------\n");
+    while (fgets(line, sizeof(line), fp) != NULL) {
+        if (strstr(line, searchKey) != NULL) {
+            printf("%s", line);
+            found++;
+        }
+    }
+    fclose(fp);
+
+    if (found == 0) {
+        printf("No transactions found for account %d.\n", accNum);
+    } else {
+        printf("--------------------------------------------------------------------\n");
+        printf("Total transactions: %d\n", found);
+    }
 }
 
 /* Prints a summary of all accounts currently stored */
@@ -292,9 +355,10 @@ void displayMenu() {
     printf("3. Withdraw\n");
     printf("4. Balance Enquiry\n");
     printf("5. List All Accounts\n");
-    printf("6. Transfer Funds\n");
-    printf("7. Close Account\n");
-    printf("8. Exit\n");
+    printf("6. Transaction History\n");
+    printf("7. Transfer Funds\n");
+    printf("8. Close Account\n");
+    printf("9. Exit\n");
     printf("Enter your choice: ");
 }
 
@@ -323,16 +387,19 @@ int main() {
                 listAllAccounts();
                 break;
             case 6:
-                transferFunds();
+                viewTransactionHistory();
                 break;
             case 7:
-                closeAccount();
+                transferFunds();
                 break;
             case 8:
+                closeAccount();
+                break;
+            case 9:
                 printf("Thank you for banking with us!\n");
                 exit(0);
             default:
-                printf("Invalid choice. Please enter 1-8.\n");
+                printf("Invalid choice. Please enter 1-9.\n");
         }
     }
 
