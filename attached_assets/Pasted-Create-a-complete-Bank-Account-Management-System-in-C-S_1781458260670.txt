@@ -1,0 +1,84 @@
+Create a complete Bank Account Management System in C.
+
+=== STRUCTURES ===
+Define this struct:
+  struct BankAccount {
+      int accountNumber;
+      char holderName[50];
+      float balance;
+  };
+
+=== FUNCTIONS TO IMPLEMENT ===
+1. void createAccount(struct BankAccount *acc)
+   - Take input: account number, holder name, initial deposit
+   - Save to file immediately after creation
+
+2. void deposit(struct BankAccount *acc)
+   - Ask amount to deposit
+   - Validate: amount must be > 0
+   - Update balance and save to file
+
+3. void withdraw(struct BankAccount *acc)
+   - Ask amount to withdraw
+   - Validate: amount > 0 AND amount <= current balance
+   - Show "Insufficient Funds" error if balance is low
+   - Update balance and save to file
+
+4. void checkBalance(struct BankAccount acc)
+   - Display account number, holder name, current balance
+
+5. void saveToFile(struct BankAccount acc)
+   - Use fwrite() to write struct to "account.dat" binary file
+
+6. void loadFromFile(struct BankAccount *acc)
+   - Use fread() to read struct from "account.dat"
+   - If file doesn't exist, call createAccount() automatically
+
+7. void displayMenu()
+   - Print the menu options
+
+=== MAIN MENU (loop with switch-case) ===
+*************************************
+*   BANK ACCOUNT MANAGEMENT SYSTEM  *
+*************************************
+1. Deposit
+2. Withdraw
+3. Balance Enquiry
+4. Exit
+Enter your choice:
+
+=== FILE HANDLING RULES ===
+- Use binary file: "account.dat"
+- Use fopen(), fwrite(), fread(), fclose()
+- Open with "wb" for write, "rb" for read
+- On program start: load data from file
+- On every transaction: save updated data to file
+- If file missing on startup: prompt to create new account
+
+=== VALIDATION RULES ===
+- Deposit amount must be > 0
+- Withdraw amount must be > 0
+- Withdraw amount must be <= current balance
+- Show appropriate error messages for invalid input
+
+=== OUTPUT FORMAT FOR TRANSACTIONS ===
+After Deposit:
+  "Amount Rs.500.00 deposited successfully!"
+  "New Balance: Rs.1500.00"
+
+After Withdraw:
+  "Amount Rs.200.00 withdrawn successfully!"
+  "Remaining Balance: Rs.1300.00"
+
+Balance Enquiry:
+  "Account Number : 1001"
+  "Account Holder : John Doe"
+  "Current Balance: Rs.1300.00"
+
+=== TECHNICAL RULES ===
+- Single file: main.c
+- Include: stdio.h, stdlib.h, string.h
+- Use struct pointer (*acc) in deposit/withdraw so changes reflect globally
+- Add a comment above every function explaining what it does
+- main() should call loadFromFile() first, then show menu in a while(1) loop
+- Exit option should print "Thank you for banking with us!" and call exit(0)
