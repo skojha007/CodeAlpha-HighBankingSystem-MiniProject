@@ -163,6 +163,48 @@ void checkBalance() {
     printf("Current Balance: Rs.%.2f\n", accounts[idx].balance);
 }
 
+/* Closes an account by number after showing details and asking for confirmation */
+void closeAccount() {
+    int accNum;
+    printf("\nEnter Account Number to close: ");
+    scanf("%d", &accNum);
+
+    int idx = findAccount(accNum);
+    if (idx == -1) {
+        printf("Error: Account number %d not found.\n", accNum);
+        return;
+    }
+
+    printf("\n--- Account to be Closed ---\n");
+    printf("Account Number : %d\n", accounts[idx].accountNumber);
+    printf("Account Holder : %s\n", accounts[idx].holderName);
+    printf("Current Balance: Rs.%.2f\n", accounts[idx].balance);
+
+    if (accounts[idx].balance > 0) {
+        printf("Warning: This account still has Rs.%.2f. Closing will forfeit the balance.\n",
+               accounts[idx].balance);
+    }
+
+    printf("Are you sure you want to close this account? (y/n): ");
+    char confirm;
+    getchar();
+    scanf("%c", &confirm);
+
+    if (confirm != 'y' && confirm != 'Y') {
+        printf("Account closure cancelled.\n");
+        return;
+    }
+
+    /* Shift all accounts after idx one position left to fill the gap */
+    for (int i = idx; i < accountCount - 1; i++) {
+        accounts[i] = accounts[i + 1];
+    }
+    accountCount--;
+    saveAllToFile();
+
+    printf("Account %d has been closed successfully.\n", accNum);
+}
+
 /* Prints a summary of all accounts currently stored */
 void listAllAccounts() {
     if (accountCount == 0) {
@@ -190,7 +232,8 @@ void displayMenu() {
     printf("3. Withdraw\n");
     printf("4. Balance Enquiry\n");
     printf("5. List All Accounts\n");
-    printf("6. Exit\n");
+    printf("6. Close Account\n");
+    printf("7. Exit\n");
     printf("Enter your choice: ");
 }
 
@@ -219,10 +262,13 @@ int main() {
                 listAllAccounts();
                 break;
             case 6:
+                closeAccount();
+                break;
+            case 7:
                 printf("Thank you for banking with us!\n");
                 exit(0);
             default:
-                printf("Invalid choice. Please enter 1-6.\n");
+                printf("Invalid choice. Please enter 1-7.\n");
         }
     }
 
