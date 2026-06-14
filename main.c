@@ -5,6 +5,8 @@
 
 #define MAX_ACCOUNTS 100
 #define MAX_PIN_ATTEMPTS 3
+#define MAX_ADMIN_ATTEMPTS 3
+#define ADMIN_PASSWORD "admin123"
 
 struct BankAccount {
     int accountNumber;
@@ -432,21 +434,151 @@ void listAllAccounts() {
     }
 }
 
+/* Prompts for the master admin password; returns 1 on success, 0 after lockout */
+int adminLogin() {
+    char entered[32];
+    printf("\n--- Admin Login ---\n");
+    for (int attempt = 1; attempt <= MAX_ADMIN_ATTEMPTS; attempt++) {
+        printf("Enter admin password: ");
+        scanf("%31s", entered);
+        if (strcmp(entered, ADMIN_PASSWORD) == 0) {
+            printf("Admin access granted.\n");
+            return 1;
+        }
+        int remaining = MAX_ADMIN_ATTEMPTS - attempt;
+        if (remaining > 0) {
+            printf("Incorrect password. %d attempt(s) remaining.\n", remaining);
+        }
+    }
+    printf("Access denied: too many incorrect attempts.\n");
+    return 0;
+}
+
+/* Displays all accounts with full details — admin only */
+void adminViewAllAccounts() {
+    if (accountCount == 0) {
+        printf("\nNo accounts on record.\n");
+        return;
+    }
+    printf("\n=== ALL ACCOUNTS (%d) ===\n", accountCount);
+    printf("%-12s %-25s %-15s\n", "Acct Number", "Holder Name", "Balance");
+    printf("------------------------------------------------------------\n");
+    for (int i = 0; i < accountCount; i++) {
+        printf("%-12d %-25s Rs.%.2f\n",
+               accounts[i].accountNumber,
+               accounts[i].holderName,
+               accounts[i].balance);
+    }
+}
+
+/* Dumps the entire transactions.log to screen — admin only */
+void adminViewAllTransactions() {
+    FILE *fp = fopen("transactions.log", "r");
+    if (fp == NULL) {
+        printf("No transaction log found.\n");
+        return;
+    }
+    char line[256];
+    int count = 0;
+    printf("\n=== FULL TRANSACTION LOG ===\n");
+    printf("--------------------------------------------------------------------\n");
+    while (fgets(line, sizeof(line), fp) != NULL) {
+        printf("%s", line);
+        count++;
+    }
+    fclose(fp);
+    if (count == 0) {
+        printf("Transaction log is empty.\n");
+    } else {
+        printf("--------------------------------------------------------------------\n");
+        printf("Total entries: %d\n", count);
+    }
+}
+
+/* Searches the full transaction log for a given account number — admin only */
+void adminSearchByAccount() {
+    int accNum;
+    printf("Enter Account Number to search: ");
+    scanf("%d", &accNum);
+
+    FILE *fp = fopen("transactions.log", "r");
+    if (fp == NULL) {
+        printf("No transaction log found.\n");
+        return;
+    }
+
+    char line[256];
+    char searchKey[16];
+    snprintf(searchKey, sizeof(searchKey), "Acct:%-6d", accNum);
+
+    int found = 0;
+    printf("\n=== Transactions for Account %d ===\n", accNum);
+    printf("--------------------------------------------------------------------\n");
+    while (fgets(line, sizeof(line), fp) != NULL) {
+        if (strstr(line, searchKey) != NULL) {
+            printf("%s", line);
+            found++;
+        }
+    }
+    fclose(fp);
+
+    if (found == 0) {
+        printf("No transactions found for account %d.\n", accNum);
+    } else {
+        printf("--------------------------------------------------------------------\n");
+        printf("Total entries: %d\n", found);
+    }
+}
+
+/* Admin sub-menu loop; requires master password to enter */
+void adminMode() {
+    if (!adminLogin()) return;
+
+    int choice;
+    while (1) {
+        printf("\n*** ADMIN MENU ***\n");
+        printf("1. View All Accounts\n");
+        printf("2. View Full Transaction Log\n");
+        printf("3. Search Transactions by Account\n");
+        printf("4. Back to Main Menu\n");
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+
+        switch (choice) {
+            case 1:
+                adminViewAllAccounts();
+                break;
+            case 2:
+                adminViewAllTransactions();
+                break;
+            case 3:
+                adminSearchByAccount();
+                break;
+            case 4:
+                printf("Returning to main menu.\n");
+                return;
+            default:
+                printf("Invalid choice. Please enter 1-4.\n");
+        }
+    }
+}
+
 /* Prints the main menu options */
 void displayMenu() {
     printf("\n*************************************\n");
     printf("*   BANK ACCOUNT MANAGEMENT SYSTEM  *\n");
     printf("*************************************\n");
-    printf("1. Create New Account\n");
-    printf("2. Deposit\n");
-    printf("3. Withdraw\n");
-    printf("4. Balance Enquiry\n");
-    printf("5. List All Accounts\n");
-    printf("6. Transaction History\n");
-    printf("7. Transfer Funds\n");
-    printf("8. Change PIN\n");
-    printf("9. Close Account\n");
-    printf("10. Exit\n");
+    printf("1.  Create New Account\n");
+    printf("2.  Deposit\n");
+    printf("3.  Withdraw\n");
+    printf("4.  Balance Enquiry\n");
+    printf("5.  List All Accounts\n");
+    printf("6.  Transaction History\n");
+    printf("7.  Transfer Funds\n");
+    printf("8.  Change PIN\n");
+    printf("9.  Close Account\n");
+    printf("10. Admin Mode\n");
+    printf("11. Exit\n");
     printf("Enter your choice: ");
 }
 
@@ -487,10 +619,13 @@ int main() {
                 closeAccount();
                 break;
             case 10:
+                adminMode();
+                break;
+            case 11:
                 printf("Thank you for banking with us!\n");
                 exit(0);
             default:
-                printf("Invalid choice. Please enter 1-10.\n");
+                printf("Invalid choice. Please enter 1-11.\n");
         }
     }
 
