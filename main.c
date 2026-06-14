@@ -4,11 +4,13 @@
 #include <time.h>
 
 #define MAX_ACCOUNTS 100
+#define MAX_PIN_ATTEMPTS 3
 
 struct BankAccount {
     int accountNumber;
     char holderName[50];
     float balance;
+    int pin;
 };
 
 /* Global account store */
@@ -71,7 +73,29 @@ int accountExists(int accNum) {
     return findAccount(accNum) != -1;
 }
 
-/* Creates a new bank account, checks for duplicates, and saves to file */
+/*
+ * Prompts for PIN up to MAX_PIN_ATTEMPTS times for the account at idx.
+ * Returns 1 if the correct PIN is entered, 0 if all attempts are exhausted.
+ */
+int verifyPin(int idx) {
+    int entered;
+    for (int attempt = 1; attempt <= MAX_PIN_ATTEMPTS; attempt++) {
+        printf("Enter PIN for Account %d: ", accounts[idx].accountNumber);
+        scanf("%d", &entered);
+        if (entered == accounts[idx].pin) {
+            return 1;
+        }
+        int remaining = MAX_PIN_ATTEMPTS - attempt;
+        if (remaining > 0) {
+            printf("Incorrect PIN. %d attempt(s) remaining.\n", remaining);
+        }
+    }
+    printf("Access denied: too many incorrect PIN attempts.\n");
+    logTransaction(accounts[idx].accountNumber, "PIN LOCKOUT", 0.0f, accounts[idx].balance);
+    return 0;
+}
+
+/* Creates a new bank account with a 4-digit PIN, checks for duplicates, saves to file */
 void createAccount() {
     if (accountCount >= MAX_ACCOUNTS) {
         printf("Error: Maximum account limit (%d) reached.\n", MAX_ACCOUNTS);
@@ -101,13 +125,30 @@ void createAccount() {
         scanf("%f", &newAcc.balance);
     }
 
+    /* PIN setup — must be exactly 4 digits and confirmed */
+    int pin1, pin2;
+    do {
+        printf("Set a 4-digit PIN: ");
+        scanf("%d", &pin1);
+        if (pin1 < 1000 || pin1 > 9999) {
+            printf("PIN must be exactly 4 digits (1000-9999). Try again.\n");
+            continue;
+        }
+        printf("Confirm PIN: ");
+        scanf("%d", &pin2);
+        if (pin1 != pin2) {
+            printf("PINs do not match. Try again.\n");
+        }
+    } while (pin1 < 1000 || pin1 > 9999 || pin1 != pin2);
+    newAcc.pin = pin1;
+
     accounts[accountCount++] = newAcc;
     saveAllToFile();
     logTransaction(newAcc.accountNumber, "ACCOUNT OPENED", newAcc.balance, newAcc.balance);
     printf("Account created successfully! (Account Number: %d)\n", newAcc.accountNumber);
 }
 
-/* Deposits a validated amount into the account with the given number */
+/* Deposits a validated amount into the account after PIN verification */
 void deposit() {
     int accNum;
     printf("\nEnter Account Number: ");
@@ -118,6 +159,8 @@ void deposit() {
         printf("Error: Account number %d not found.\n", accNum);
         return;
     }
+
+    if (!verifyPin(idx)) return;
 
     float amount;
     printf("Enter amount to deposit: Rs.");
@@ -134,7 +177,7 @@ void deposit() {
     printf("New Balance: Rs.%.2f\n", accounts[idx].balance);
 }
 
-/* Withdraws a validated amount from the account with the given number */
+/* Withdraws a validated amount from the account after PIN verification */
 void withdraw() {
     int accNum;
     printf("\nEnter Account Number: ");
@@ -145,6 +188,8 @@ void withdraw() {
         printf("Error: Account number %d not found.\n", accNum);
         return;
     }
+
+    if (!verifyPin(idx)) return;
 
     float amount;
     printf("Enter amount to withdraw: Rs.");
@@ -165,7 +210,7 @@ void withdraw() {
     printf("Remaining Balance: Rs.%.2f\n", accounts[idx].balance);
 }
 
-/* Displays the account number, holder name, and balance for a given account */
+/* Displays the account number, holder name, and balance (no PIN required) */
 void checkBalance() {
     int accNum;
     printf("\nEnter Account Number: ");
@@ -183,7 +228,43 @@ void checkBalance() {
     printf("Current Balance: Rs.%.2f\n", accounts[idx].balance);
 }
 
-/* Closes an account by number after showing details and asking for confirmation */
+/* Allows the account holder to change their PIN after verifying the current one */
+void changePin() {
+    int accNum;
+    printf("\nEnter Account Number: ");
+    scanf("%d", &accNum);
+
+    int idx = findAccount(accNum);
+    if (idx == -1) {
+        printf("Error: Account number %d not found.\n", accNum);
+        return;
+    }
+
+    printf("Verify current PIN to proceed.\n");
+    if (!verifyPin(idx)) return;
+
+    int newPin1, newPin2;
+    do {
+        printf("Enter new 4-digit PIN: ");
+        scanf("%d", &newPin1);
+        if (newPin1 < 1000 || newPin1 > 9999) {
+            printf("PIN must be exactly 4 digits (1000-9999). Try again.\n");
+            continue;
+        }
+        printf("Confirm new PIN: ");
+        scanf("%d", &newPin2);
+        if (newPin1 != newPin2) {
+            printf("PINs do not match. Try again.\n");
+        }
+    } while (newPin1 < 1000 || newPin1 > 9999 || newPin1 != newPin2);
+
+    accounts[idx].pin = newPin1;
+    saveAllToFile();
+    logTransaction(accounts[idx].accountNumber, "PIN CHANGED", 0.0f, accounts[idx].balance);
+    printf("PIN changed successfully for Account %d.\n", accNum);
+}
+
+/* Closes an account after PIN verification and y/n confirmation */
 void closeAccount() {
     int accNum;
     printf("\nEnter Account Number to close: ");
@@ -194,6 +275,8 @@ void closeAccount() {
         printf("Error: Account number %d not found.\n", accNum);
         return;
     }
+
+    if (!verifyPin(idx)) return;
 
     printf("\n--- Account to be Closed ---\n");
     printf("Account Number : %d\n", accounts[idx].accountNumber);
@@ -215,6 +298,8 @@ void closeAccount() {
         return;
     }
 
+    logTransaction(accNum, "ACCOUNT CLOSED", 0.0f, accounts[idx].balance);
+
     /* Shift all accounts after idx one position left to fill the gap */
     for (int i = idx; i < accountCount - 1; i++) {
         accounts[i] = accounts[i + 1];
@@ -225,7 +310,7 @@ void closeAccount() {
     printf("Account %d has been closed successfully.\n", accNum);
 }
 
-/* Transfers a validated amount from one account to another atomically */
+/* Transfers funds from source to destination after verifying source PIN */
 void transferFunds() {
     int fromAccNum, toAccNum;
 
@@ -238,6 +323,8 @@ void transferFunds() {
         printf("Error: Source account %d not found.\n", fromAccNum);
         return;
     }
+
+    if (!verifyPin(fromIdx)) return;
 
     printf("Enter Destination Account Number: ");
     scanf("%d", &toAccNum);
@@ -357,8 +444,9 @@ void displayMenu() {
     printf("5. List All Accounts\n");
     printf("6. Transaction History\n");
     printf("7. Transfer Funds\n");
-    printf("8. Close Account\n");
-    printf("9. Exit\n");
+    printf("8. Change PIN\n");
+    printf("9. Close Account\n");
+    printf("10. Exit\n");
     printf("Enter your choice: ");
 }
 
@@ -393,13 +481,16 @@ int main() {
                 transferFunds();
                 break;
             case 8:
-                closeAccount();
+                changePin();
                 break;
             case 9:
+                closeAccount();
+                break;
+            case 10:
                 printf("Thank you for banking with us!\n");
                 exit(0);
             default:
-                printf("Invalid choice. Please enter 1-9.\n");
+                printf("Invalid choice. Please enter 1-10.\n");
         }
     }
 
