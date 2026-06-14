@@ -2,94 +2,182 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAX_ACCOUNTS 100
+
 struct BankAccount {
     int accountNumber;
     char holderName[50];
     float balance;
 };
 
-/* Saves the bank account struct to a binary file "account.dat" */
-void saveToFile(struct BankAccount acc) {
+/* Global account store */
+struct BankAccount accounts[MAX_ACCOUNTS];
+int accountCount = 0;
+
+/* Saves all accounts to binary file "account.dat" (count + all structs) */
+void saveAllToFile() {
     FILE *fp = fopen("account.dat", "wb");
     if (fp == NULL) {
         printf("Error: Could not open file for writing.\n");
         return;
     }
-    fwrite(&acc, sizeof(struct BankAccount), 1, fp);
+    fwrite(&accountCount, sizeof(int), 1, fp);
+    fwrite(accounts, sizeof(struct BankAccount), accountCount, fp);
     fclose(fp);
 }
 
-/* Creates a new bank account by taking user input and saving to file */
-void createAccount(struct BankAccount *acc) {
-    printf("\n--- Create New Account ---\n");
-    printf("Enter Account Number: ");
-    scanf("%d", &acc->accountNumber);
-    printf("Enter Account Holder Name: ");
-    getchar();
-    fgets(acc->holderName, 50, stdin);
-    acc->holderName[strcspn(acc->holderName, "\n")] = '\0';
-    printf("Enter Initial Deposit Amount: Rs.");
-    scanf("%f", &acc->balance);
-    while (acc->balance < 0) {
-        printf("Initial deposit cannot be negative. Enter amount: Rs.");
-        scanf("%f", &acc->balance);
-    }
-    saveToFile(*acc);
-    printf("Account created successfully!\n");
-}
-
-/* Loads account data from binary file; creates new account if file is missing */
-void loadFromFile(struct BankAccount *acc) {
+/* Loads all accounts from "account.dat"; starts empty if file doesn't exist */
+void loadAllFromFile() {
     FILE *fp = fopen("account.dat", "rb");
     if (fp == NULL) {
-        printf("No existing account found. Please create a new account.\n");
-        createAccount(acc);
+        accountCount = 0;
         return;
     }
-    fread(acc, sizeof(struct BankAccount), 1, fp);
+    fread(&accountCount, sizeof(int), 1, fp);
+    fread(accounts, sizeof(struct BankAccount), accountCount, fp);
     fclose(fp);
+    printf("Loaded %d account(s) from file.\n", accountCount);
 }
 
-/* Deposits a validated amount into the account and saves updated data */
-void deposit(struct BankAccount *acc) {
+/* Searches accounts by account number; returns index or -1 if not found */
+int findAccount(int accNum) {
+    for (int i = 0; i < accountCount; i++) {
+        if (accounts[i].accountNumber == accNum) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/* Checks whether an account number already exists in the store */
+int accountExists(int accNum) {
+    return findAccount(accNum) != -1;
+}
+
+/* Creates a new bank account, checks for duplicates, and saves to file */
+void createAccount() {
+    if (accountCount >= MAX_ACCOUNTS) {
+        printf("Error: Maximum account limit (%d) reached.\n", MAX_ACCOUNTS);
+        return;
+    }
+
+    struct BankAccount newAcc;
+
+    printf("\n--- Create New Account ---\n");
+    printf("Enter Account Number: ");
+    scanf("%d", &newAcc.accountNumber);
+
+    if (accountExists(newAcc.accountNumber)) {
+        printf("Error: Account number %d already exists.\n", newAcc.accountNumber);
+        return;
+    }
+
+    printf("Enter Account Holder Name: ");
+    getchar();
+    fgets(newAcc.holderName, 50, stdin);
+    newAcc.holderName[strcspn(newAcc.holderName, "\n")] = '\0';
+
+    printf("Enter Initial Deposit Amount: Rs.");
+    scanf("%f", &newAcc.balance);
+    while (newAcc.balance < 0) {
+        printf("Initial deposit cannot be negative. Enter amount: Rs.");
+        scanf("%f", &newAcc.balance);
+    }
+
+    accounts[accountCount++] = newAcc;
+    saveAllToFile();
+    printf("Account created successfully! (Account Number: %d)\n", newAcc.accountNumber);
+}
+
+/* Deposits a validated amount into the account with the given number */
+void deposit() {
+    int accNum;
+    printf("\nEnter Account Number: ");
+    scanf("%d", &accNum);
+
+    int idx = findAccount(accNum);
+    if (idx == -1) {
+        printf("Error: Account number %d not found.\n", accNum);
+        return;
+    }
+
     float amount;
-    printf("\nEnter amount to deposit: Rs.");
+    printf("Enter amount to deposit: Rs.");
     scanf("%f", &amount);
     if (amount <= 0) {
         printf("Error: Deposit amount must be greater than 0.\n");
         return;
     }
-    acc->balance += amount;
-    saveToFile(*acc);
+
+    accounts[idx].balance += amount;
+    saveAllToFile();
     printf("Amount Rs.%.2f deposited successfully!\n", amount);
-    printf("New Balance: Rs.%.2f\n", acc->balance);
+    printf("New Balance: Rs.%.2f\n", accounts[idx].balance);
 }
 
-/* Withdraws a validated amount from the account if sufficient funds exist */
-void withdraw(struct BankAccount *acc) {
+/* Withdraws a validated amount from the account with the given number */
+void withdraw() {
+    int accNum;
+    printf("\nEnter Account Number: ");
+    scanf("%d", &accNum);
+
+    int idx = findAccount(accNum);
+    if (idx == -1) {
+        printf("Error: Account number %d not found.\n", accNum);
+        return;
+    }
+
     float amount;
-    printf("\nEnter amount to withdraw: Rs.");
+    printf("Enter amount to withdraw: Rs.");
     scanf("%f", &amount);
     if (amount <= 0) {
         printf("Error: Withdrawal amount must be greater than 0.\n");
         return;
     }
-    if (amount > acc->balance) {
+    if (amount > accounts[idx].balance) {
         printf("Error: Insufficient Funds.\n");
         return;
     }
-    acc->balance -= amount;
-    saveToFile(*acc);
+
+    accounts[idx].balance -= amount;
+    saveAllToFile();
     printf("Amount Rs.%.2f withdrawn successfully!\n", amount);
-    printf("Remaining Balance: Rs.%.2f\n", acc->balance);
+    printf("Remaining Balance: Rs.%.2f\n", accounts[idx].balance);
 }
 
-/* Displays the account number, holder name, and current balance */
-void checkBalance(struct BankAccount acc) {
+/* Displays the account number, holder name, and balance for a given account */
+void checkBalance() {
+    int accNum;
+    printf("\nEnter Account Number: ");
+    scanf("%d", &accNum);
+
+    int idx = findAccount(accNum);
+    if (idx == -1) {
+        printf("Error: Account number %d not found.\n", accNum);
+        return;
+    }
+
     printf("\n--- Balance Enquiry ---\n");
-    printf("Account Number : %d\n", acc.accountNumber);
-    printf("Account Holder : %s\n", acc.holderName);
-    printf("Current Balance: Rs.%.2f\n", acc.balance);
+    printf("Account Number : %d\n", accounts[idx].accountNumber);
+    printf("Account Holder : %s\n", accounts[idx].holderName);
+    printf("Current Balance: Rs.%.2f\n", accounts[idx].balance);
+}
+
+/* Prints a summary of all accounts currently stored */
+void listAllAccounts() {
+    if (accountCount == 0) {
+        printf("\nNo accounts found.\n");
+        return;
+    }
+    printf("\n--- All Accounts (%d) ---\n", accountCount);
+    printf("%-15s %-25s %-15s\n", "Acct Number", "Holder Name", "Balance");
+    printf("-------------------------------------------------------\n");
+    for (int i = 0; i < accountCount; i++) {
+        printf("%-15d %-25s Rs.%-12.2f\n",
+               accounts[i].accountNumber,
+               accounts[i].holderName,
+               accounts[i].balance);
+    }
 }
 
 /* Prints the main menu options */
@@ -97,38 +185,44 @@ void displayMenu() {
     printf("\n*************************************\n");
     printf("*   BANK ACCOUNT MANAGEMENT SYSTEM  *\n");
     printf("*************************************\n");
-    printf("1. Deposit\n");
-    printf("2. Withdraw\n");
-    printf("3. Balance Enquiry\n");
-    printf("4. Exit\n");
+    printf("1. Create New Account\n");
+    printf("2. Deposit\n");
+    printf("3. Withdraw\n");
+    printf("4. Balance Enquiry\n");
+    printf("5. List All Accounts\n");
+    printf("6. Exit\n");
     printf("Enter your choice: ");
 }
 
 int main() {
-    struct BankAccount account;
+    loadAllFromFile();
+
     int choice;
-
-    loadFromFile(&account);
-
     while (1) {
         displayMenu();
         scanf("%d", &choice);
 
         switch (choice) {
             case 1:
-                deposit(&account);
+                createAccount();
                 break;
             case 2:
-                withdraw(&account);
+                deposit();
                 break;
             case 3:
-                checkBalance(account);
+                withdraw();
                 break;
             case 4:
+                checkBalance();
+                break;
+            case 5:
+                listAllAccounts();
+                break;
+            case 6:
                 printf("Thank you for banking with us!\n");
                 exit(0);
             default:
-                printf("Invalid choice. Please enter 1-4.\n");
+                printf("Invalid choice. Please enter 1-6.\n");
         }
     }
 
