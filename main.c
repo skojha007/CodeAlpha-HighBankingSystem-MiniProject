@@ -530,6 +530,63 @@ void adminSearchByAccount() {
     }
 }
 
+/*
+ * Previews annual interest on all accounts at a given rate, then asks
+ * the admin to confirm before committing the updated balances to file.
+ */
+void adminApplyInterest() {
+    if (accountCount == 0) {
+        printf("\nNo accounts on record.\n");
+        return;
+    }
+
+    float rate;
+    printf("\nEnter annual interest rate (%% per year, e.g. 5.5): ");
+    scanf("%f", &rate);
+    if (rate <= 0 || rate > 100) {
+        printf("Error: Rate must be between 0 and 100.\n");
+        return;
+    }
+
+    float multiplier = rate / 100.0f;
+
+    printf("\n--- Interest Preview at %.2f%% per annum ---\n", rate);
+    printf("%-12s %-22s %-14s %-14s %-14s\n",
+           "Acct No.", "Holder Name", "Current Bal", "Interest", "New Balance");
+    printf("------------------------------------------------------------------------\n");
+    for (int i = 0; i < accountCount; i++) {
+        float interest  = accounts[i].balance * multiplier;
+        float newBal    = accounts[i].balance + interest;
+        printf("%-12d %-22s Rs.%-11.2f Rs.%-10.2f Rs.%-10.2f\n",
+               accounts[i].accountNumber,
+               accounts[i].holderName,
+               accounts[i].balance,
+               interest,
+               newBal);
+    }
+    printf("------------------------------------------------------------------------\n");
+
+    printf("Apply this interest to all %d account(s)? (y/n): ", accountCount);
+    char confirm;
+    getchar();
+    scanf("%c", &confirm);
+
+    if (confirm != 'y' && confirm != 'Y') {
+        printf("Interest application cancelled.\n");
+        return;
+    }
+
+    /* Commit: update each account balance and log the transaction */
+    for (int i = 0; i < accountCount; i++) {
+        float interest = accounts[i].balance * multiplier;
+        accounts[i].balance += interest;
+        logTransaction(accounts[i].accountNumber, "INTEREST APPLIED", interest, accounts[i].balance);
+    }
+    saveAllToFile();
+    printf("Interest of %.2f%% applied to all %d account(s) successfully.\n",
+           rate, accountCount);
+}
+
 /* Admin sub-menu loop; requires master password to enter */
 void adminMode() {
     if (!adminLogin()) return;
@@ -540,7 +597,8 @@ void adminMode() {
         printf("1. View All Accounts\n");
         printf("2. View Full Transaction Log\n");
         printf("3. Search Transactions by Account\n");
-        printf("4. Back to Main Menu\n");
+        printf("4. Apply Interest to All Accounts\n");
+        printf("5. Back to Main Menu\n");
         printf("Enter your choice: ");
         scanf("%d", &choice);
 
@@ -555,10 +613,13 @@ void adminMode() {
                 adminSearchByAccount();
                 break;
             case 4:
+                adminApplyInterest();
+                break;
+            case 5:
                 printf("Returning to main menu.\n");
                 return;
             default:
-                printf("Invalid choice. Please enter 1-4.\n");
+                printf("Invalid choice. Please enter 1-5.\n");
         }
     }
 }
