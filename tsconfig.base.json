@@ -21,12 +21,7 @@
     "skipLibCheck": true,
     "target": "es2022",
     "types": [],
-    "customConditions": ["workspace"]
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
-    "module": "esnext",
-    "moduleResolution": "bundler",
-
+    "customConditions": ["workspace"],
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true
   }
