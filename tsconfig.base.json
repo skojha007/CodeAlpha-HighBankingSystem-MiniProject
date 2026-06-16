@@ -24,5 +24,10 @@
     "customConditions": ["workspace"]
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true
+    "module": "esnext",
+    "moduleResolution": "bundler",
+
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
   }
 }
